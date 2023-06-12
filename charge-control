@@ -30,17 +30,18 @@ usage() {
 printf "charge-control allows controlling battery charge to avoid overstressing the
 battery with full charges or full discharges. The script requires root permissions.
 
-Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF]
+Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION]
 
 Options:
   -d DEACTIVATION: battery percentage at which charge is disabled (default: 90)
   -r REACTIVATION: battery percentage at which charge is enabled (default: 75)
   -f FREQUENCY: monitoring frequency of battery level (default: 10s)
-  -p POWEROFF: battery percentage at which the device is powered off (default: 5)
+  -p POWEROFF: battery percentage at which the device is powered off (default: 10)
+  -a ANIMATION: on/off to enable or disable (lower CPU usage) spinning animation (default: on)
   -h: show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
-if not prefixed with flags, or can be provided in any order if prefixed with flags.
+if not prefixed with flags, or provided in any order if prefixed with flags.
 
 "
 exit 0
@@ -57,12 +58,16 @@ cleanup() {
 # Monitoring spinner symbols
 spinner() {
     local chars="⣷⣯⣟⡿⢿⣻⣽⣾"
-    while :; do
+    if [[ "$animation" == "off" ]]; then
+	printf '  🕓 Monitoring battery level…\r'
+    else
+	while :; do
         for (( i = 0; i < ${#chars}; i++ )); do
             printf '  %s Monitoring battery level…\r' "${chars:$i:1}"
             sleep 0.5
         done
-    done
+	done
+    fi
 }
 
 # Check that argument values are legal
@@ -96,7 +101,7 @@ check_values() {
   Charge deactivation level: %s%%
   Charge reactivation level: %s%%
   Monitoring frequency: %s
-  Auto power off level: %s%%\n' "$deactivation" "$reactivation" "$frequency" "$poweroff"
+  Auto power-off level: %s%%\n' "$deactivation" "$reactivation" "$frequency" "$poweroff"
         uevent=$(<"/sys/class/power_supply/battery/uevent")
         capacity=$(grep -oP "(?<=POWER_SUPPLY_CAPACITY=).*" <<< "$uevent")
 	if (( capacity >= $reactivation )) && (( capacity < $deactivation )); then
@@ -145,7 +150,7 @@ monitor() {
 		    printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
                 elif (( capacity <= $poweroff )); then
                     echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
-                    printf '\033[31m  ▪ Charge level critically low (< %s%%), powering off in 60s…\033[0m (%s)\n' "$poweroff" "$(date +'%R')"
+                    printf '\033[31m  ▪ Battery level critically low (< %s%%), powering off in 60s…\033[0m (%s)\n' "$poweroff" "$(date +'%R')"
                     sleep 60s
 		    poweroff --halt
                 fi
@@ -167,13 +172,15 @@ deactivation=90
 reactivation=75
 frequency=10s
 poweroff=10
+animation=on
 no_flags=true  # Flag to track if no flags were used
-while getopts "d:r:f:p:h" opt; do
+while getopts "d:r:f:p:a:h" opt; do
   case $opt in
     d) deactivation=$OPTARG; no_flags=false ;;
     r) reactivation=$OPTARG; no_flags=false ;;
     f) frequency=$OPTARG; no_flags=false ;;
     p) poweroff=$OPTARG; no_flags=false ;;
+    a) animation=$OPTARG; no_flags=false ;;
     h | *) usage ;;
   esac
 done
@@ -184,7 +191,8 @@ if $no_flags && [[ $# -gt 0 ]]; then # Positional arguments detected without fla
     deactivation=${1:-90}
     reactivation=${2:-75}
     frequency=${3:-10s}
-    poweroff=${4:-5}
+    poweroff=${4:-10}
+    animation=${5:-on}
 elif [[ $# -gt 0 ]]; then
     printf 'Flag(s) detected, any positional argument not prefixed with a flag will be ignored.\n'
 else
@@ -196,5 +204,5 @@ if [[ ! $UID = 0 ]]; then
     printf "This script must be run as root.\n"
     exit 0
 else
-    check_values $deactivation $reactivation $frequency $poweroff
+    check_values $deactivation $reactivation $frequency $poweroff $animation
 fi
