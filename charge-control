@@ -62,15 +62,20 @@ spinner() {
 
     case $animation in
         1) chars="⠁⠂⠄⡀⡈⡐⡠⣀⣁⣂⣄⣌⣔⣤⣥⣦⣮⣶⣷⣿⡿⠿⢟⠟⡛⠛⠫⢋⠋⠍⡉⠉⠑⠡⢁"
-	   sleep_duration=0.25;;
+	   sleep_duration=0.3
+	   ;;
         2) chars="⣷⣯⣟⡿⢿⣻⣽⣾"
-           sleep_duration=0.5;;
+           sleep_duration=0.6
+	   ;;
         3) chars="▖▘▝▗"
-           sleep_duration=1;;
+           sleep_duration=1.5
+	   ;;
         4) chars="▁▃▄▅▆▇█▇▆▅▄▃"
-           sleep_duration=2;;
+           sleep_duration=3
+	   ;;
         *) chars="⣷⣯⣟⡿⢿⣻⣽⣾"
-           sleep_duration=0.5;;  # Default animation
+           sleep_duration=0.6
+	   ;;  # Default animation
     esac
 
     while :; do
