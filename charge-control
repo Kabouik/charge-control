@@ -46,6 +46,14 @@ if not prefixed with flags, or can be provided in any order if prefixed with fla
 exit 0
 }
 
+# Exit gracefully and reset charge control
+cleanup() {
+    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+    printf '\033[34m\n○ Charge control disabled\033[0m'
+    printf '\033[?25h' # Restore the cursor block
+    exit 0
+}
+
 # Monitoring spinner symbols
 spinner() {
     local chars="⣷⣯⣟⡿⢿⣻⣽⣾"
@@ -59,7 +67,19 @@ spinner() {
 
 # Check that argument values are legal
 check_values() {
-    if (( $deactivation > 100 )) || (( $reactivation > 100 )); then
+    if [[ ! $deactivation =~ ^[0-9]+$ ]]; then
+	printf '\033[31mInvalid DEACTIVATION percentage: this must be a numeric value between 50 and 100. Aborting.\033[0m\n'
+	exit 0
+    elif [[ ! $reactivation =~ ^[0-9]+$ ]]; then
+	printf '\033[31mInvalid REACTIVATION percentage: this must be a numeric value between 20 and 98. Aborting.\033[0m\n'
+	exit 0
+    elif [[ ! $frequency =~ ^[0-9]+[sm]?$ ]]; then
+	printf '\033[31mInvalid FREQUENCY: this must be a numeric value, with or without unit (s, m) suffix, e.g., 10, 10s, 2m, etc.\033[0m\n'
+	exit 0
+    elif [[ ! $poweroff =~ ^[0-9]+$ ]]; then
+	printf '\033[31mInvalid POWEROFF percentage: this must be a numeric value between 1 and 25. Aborting.\033[0m\n'
+	exit 0
+    elif (( $deactivation > 100 )) || (( $reactivation > 100 )); then
 	printf '\033[31mCharge DEACTIVATION and REACTIVATION levels cannot be higher than 100%%. Aborting.\033[0m\n'
 	exit 0
     elif (( $deactivation - $reactivation < 2 )); then
@@ -71,15 +91,29 @@ check_values() {
     elif (( $poweroff < 1 )) || (( $poweroff > 25 )); then
 	printf '\033[31mPOWEROFF level must be between 1%% and 25%%. Aborting.\033[0m\n'
 	exit 0
+    else
+	printf '\033[34m● Charge control enabled\033[0m
+  Charge deactivation level: %s%%
+  Charge reactivation level: %s%%
+  Monitoring frequency: %s
+  Auto power off level: %s%%\n' "$deactivation" "$reactivation" "$frequency" "$poweroff"
+        uevent=$(<"/sys/class/power_supply/battery/uevent")
+        capacity=$(grep -oP "(?<=POWER_SUPPLY_CAPACITY=).*" <<< "$uevent")
+	if (( capacity >= $reactivation )) && (( capacity < $deactivation )); then
+	    readytocharge="1"
+            echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+            printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
+        elif (( capacity <= $reactivation )); then
+	    readytocharge="1"
+            echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+            printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
+        elif (( capacity >= $deactivation )); then
+	    readytocharge="0"
+            echo 1 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+            printf '\033[33m  ▪ Charge disabled until battery drops to %s%%\033[0m (%s)\n' "$reactivation" "$(date +'%R')"
+        fi
+	monitor
     fi
-}
-
-# Exit gracefully and reset charge control
-cleanup() {
-    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
-    printf '\033[34m\n○ Charge control disabled\033[0m'
-    printf '\033[?25h' # Restore the cursor block
-    exit 0
 }
 
 # Monitor battery level and manage charge
@@ -96,14 +130,19 @@ monitor() {
         case "$status" in
             "Charging")
                 if (( capacity >= $deactivation )); then
+		    readytocharge="0"
                     echo 1 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
                     printf '\033[33m  ▪ Charge disabled until battery drops to %s%%\033[0m (%s)\n' "$reactivation" "$(date +'%R')"
                 fi
                 ;;
             "Discharging")
-                if (( capacity <= $reactivation )) && [[ "$suspend" == "1" ]]; then
+                if (( capacity <= $reactivation )) && [[ "$suspend" -eq "1" ]]; then
                     echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
                     printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
+                elif (( capacity <= $reactivation )) && [[ "$suspend" -eq "0" ]] && [[ "$readytocharge" -eq "0" ]]; then
+		    readytocharge="1"
+		    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+		    printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
                 elif (( capacity <= $poweroff )); then
                     echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
                     printf '\033[31m  ▪ Charge level critically low (< %s%%), powering off in 60s…\033[0m (%s)\n' "$poweroff" "$(date +'%R')"
@@ -123,35 +162,6 @@ monitor() {
     cleanup
 }
 
-# Handle argument checking and execution
-handle_arguments() {
-    check_values $deactivation $reactivation $frequency $poweroff
-    printf '\033[34m● Charge control enabled\033[0m
-  Charge deactivation level: %s%%
-  Charge reactivation level: %s%%
-  Monitoring frequency: %s
-  Auto power off level: %s%%\n' "$deactivation" "$reactivation" "$frequency" "$poweroff"
-    uevent=$(<"/sys/class/power_supply/battery/uevent")
-    status=$(grep -oP "(?<=POWER_SUPPLY_STATUS=).*" <<< "$uevent")
-    capacity=$(grep -oP "(?<=POWER_SUPPLY_CAPACITY=).*" <<< "$uevent")
-    suspend=$(grep -oP "(?<=POWER_INPUT_SUSPEND=).*" <<< "$uevent")
-    if (( capacity < $deactivation )); then
-        printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
-    elif (( capacity > $deactivation )); then
-        echo 1 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
-        printf '\033[33m  ▪ Charge disabled until battery drops to %s%%\033[0m (%s)\n' "$reactivation" "$(date +'%R')"
-    fi
-    monitor "$deactivation" "$reactivation" "$frequency" "$poweroff"
-}
-
-# Execute the code regardless of argument presence
-if [[ ! $UID = 0 ]] && [[ "$1" == "-h" || "$1" == "-help" || "$1" == "h" || "$1" == "help" || "$1" == "--h" || "$1" == "--help"  ]]; then
-    usage
-elif [[ ! $UID = 0 ]]; then
-    printf "This script must be run as root.\n"
-    exit 0
-fi
-
 # Parse arguments using getopts
 deactivation=90
 reactivation=75
@@ -164,8 +174,7 @@ while getopts "d:r:f:p:h" opt; do
     r) reactivation=$OPTARG; no_flags=false ;;
     f) frequency=$OPTARG; no_flags=false ;;
     p) poweroff=$OPTARG; no_flags=false ;;
-    h) usage ;;
-    *) exit 1 ;;
+    h | *) usage ;;
   esac
 done
 
@@ -182,23 +191,10 @@ else
     printf 'No argument(s) provided, using only default values.\n'
 fi
 
-# Validate argument values
-if [[ ! $deactivation =~ ^[0-9]+$ ]]; then
-    printf '\033[31mInvalid DEACTIVATION percentage: this must be a numeric value between 50 and 100. Aborting.\033[0m\n'
-    exit 1
-elif [[ ! $reactivation =~ ^[0-9]+$ ]]; then
-    printf '\033[31mInvalid REACTIVATION percentage: this must be a numeric value between 20 and 98. Aborting.\033[0m\n'
-    exit 1
-elif [[ ! $frequency =~ ^[0-9]+[sm]?$ ]]; then
-    printf '\033[31mInvalid FREQUENCY: this must be a numeric value, with or without unit (s, m) suffix, e.g., 10, 10s, 2m, etc.\033[0m\n'
-    exit 1
-elif [[ ! $poweroff =~ ^[0-9]+$ ]]; then
-    printf '\033[31mInvalid POWEROFF percentage: this must be a numeric value between 1 and 25. Aborting.\033[0m\n'
-    exit 1
+# Check permissions
+if [[ ! $UID = 0 ]]; then
+    printf "This script must be run as root.\n"
+    exit 0
+else
+    check_values $deactivation $reactivation $frequency $poweroff
 fi
-
-# Check the argument values
-check_values "$deactivation" "$reactivation" "$frequency" "$poweroff"
-
-# Handle the arguments and execute the code
-handle_arguments "$deactivation" "$reactivation" "$frequency" "$poweroff"
