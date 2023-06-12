@@ -37,7 +37,7 @@ Options:
   -r REACTIVATION: battery percentage at which charge is enabled (default: 75)
   -f FREQUENCY: monitoring frequency of battery level (default: 10s)
   -p POWEROFF: battery percentage at which the device is powered off (default: 10)
-  -a ANIMATION: on/off to enable or disable (lower CPU usage) spinning animation (default: on)
+  -a ANIMATION: monitoring animation, 1, 2, 3 or 4, in decreasing CPU usage order (default: 2)
   -h: show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
@@ -57,17 +57,28 @@ cleanup() {
 
 # Monitoring spinner symbols
 spinner() {
-    local chars="⣷⣯⣟⡿⢿⣻⣽⣾"
-    if [[ "$animation" == "off" ]]; then
-	printf '  🕓 Monitoring battery level…\r'
-    else
-	while :; do
+    local chars
+    local sleep_duration
+
+    case $animation in
+        1) chars="⠁⠂⠄⡀⡈⡐⡠⣀⣁⣂⣄⣌⣔⣤⣥⣦⣮⣶⣷⣿⡿⠿⢟⠟⡛⠛⠫⢋⠋⠍⡉⠉⠑⠡⢁"
+	   sleep_duration=0.25;;
+        2) chars="⣷⣯⣟⡿⢿⣻⣽⣾"
+           sleep_duration=0.5;;
+        3) chars="▖▘▝▗"
+           sleep_duration=1;;
+        4) chars="▁▃▄▅▆▇█▇▆▅▄▃"
+           sleep_duration=2;;
+        *) chars="⣷⣯⣟⡿⢿⣻⣽⣾"
+           sleep_duration=0.5;;  # Default animation
+    esac
+
+    while :; do
         for (( i = 0; i < ${#chars}; i++ )); do
-            printf '  %s Monitoring battery level…\r' "${chars:$i:1}"
-            sleep 0.5
+            printf '  %s Monitoring battery level...\r' "${chars:$i:1}"
+            sleep "$sleep_duration"
         done
-	done
-    fi
+    done
 }
 
 # Check that argument values are legal
@@ -172,7 +183,7 @@ deactivation=90
 reactivation=75
 frequency=10s
 poweroff=10
-animation=on
+animation=2
 no_flags=true  # Flag to track if no flags were used
 while getopts "d:r:f:p:a:h" opt; do
   case $opt in
@@ -192,7 +203,7 @@ if $no_flags && [[ $# -gt 0 ]]; then # Positional arguments detected without fla
     reactivation=${2:-75}
     frequency=${3:-10s}
     poweroff=${4:-10}
-    animation=${5:-on}
+    animation=${5:-2}
 elif [[ $# -gt 0 ]]; then
     printf 'Flag(s) detected, any positional argument not prefixed with a flag will be ignored.\n'
 else

@@ -11,7 +11,7 @@ Options:
   -r REACTIVATION: battery percentage at which charge is enabled (default: 75)
   -f FREQUENCY: monitoring frequency of battery level (default: 10s)
   -p POWEROFF: battery percentage at which the device is powered off (default: 10)
-  -a ANIMATION: on/off to enable or disable (lower CPU usage) spinning animation (default: on)
+  -a ANIMATION: monitoring animation, 1, 2, 3 or 4, in decreasing CPU usage order (default: 2)
   -h: show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
