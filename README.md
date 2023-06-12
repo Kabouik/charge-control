@@ -25,6 +25,7 @@ if not prefixed with flags, or can be provided in any order if prefixed with fla
   Monitoring frequency: 10
   Auto power off level: 10%
   ▪ Charge enabled until battery reaches 90% (20:29)
+  ▪ Charge disabled until battery drops to 75% (21:02)  
   ⣷ Monitoring battery level...
 ```
 
