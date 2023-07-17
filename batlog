@@ -42,7 +42,7 @@ exit 0
 
 # Create file, check variable values and loop
 main() {
-    printf "Logging to '%s' every %s seconds…\n" "$file" "$interval"
+    printf "Logging to '%s' at a %s interval…\n" "$file" "$interval"
 
     # Create the file if it doesn't exist and add header if it's a new file
     if [ ! -f "$file" ]; then
