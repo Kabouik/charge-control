@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+
+# Copyright © [2023] Mathieu Laparie <mlaparie [at] disr [dot] it>
+
+# MIT License
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# Function to show usage/help
+usage() {
+printf "batlog allows monitoring battery level and CPU usage and speed over time.
+
+Usage: ./batlog [-f FILE] [-i INTERVAL]
+
+Options:
+  -f FILE: file to log data to (default: ~/battery-log.csv)
+  -i INTERVAL: log frequency, set as a duration (default: 60s)
+  -h: show this help
+
+All arguments are optional. Values can be provided as positional arguments in that order
+if not prefixed with flags, or provided in any order if prefixed with flags.
+
+"
+exit 0
+}
+
+# Create file, check variable values and loop
+main() {
+    printf "Logging to '%s' every %s seconds…\n" "$file" "$interval"
+
+    # Create the file if it doesn't exist and add header if it's a new file
+    if [ ! -f "$file" ]; then
+	echo "Timestamp; Battery level (%); CPU usage (%); CPU frequency; Battery temperature (°C); Most CPU intensive processes" > "$file"
+    fi
+    head -n 1 "$file"
+
+    # Monitor variables
+    while :; do
+	capacity=$(cat "/sys/class/power_supply/battery/capacity")
+	temperature=$(sensors | grep "battery" -A2 | grep "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	if ! type batman-helper >/dev/null 2>&1; then
+	    percentage=$(top -bn1 | grep "Cpu(s)" | \
+			     sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
+			     awk '{print 100 - $1"%"}')
+	else
+	    percentage=$(batman-helper cpu)
+	fi
+	speed=$(cpufreq-info -m -c $(cpufreq-info -r) | grep "current CPU frequency is" | cut -d ' ' -f 7-8 | cut -d 'H' -f 1-2 | sed 's/Hz./Hz/g')
+	processes=$(ps -Ao comm --sort=-pcpu | head -n 20 | xargs \
+			| sed 's/ps //g' \
+			| sed 's/sed //g' \
+			| sed 's/head //g' \
+			| sed 's/xargs //g' \
+			| sed 's/cut //g' \
+			| sed 's/bash //g' \
+			| cut -d ' ' -f 2-6 \
+			| sed 's/ /, /g')
+	echo "$(date -Is); $capacity; $percentage; $speed; $temperature; $processes" >> "$file"
+	tail -n 1 "$file"
+	sleep $interval
+    done
+}
+
+# Parse arguments using getopts
+file="$HOME/battery-log.csv"
+interval=60
+no_flags=true  # Flag to track if no flags were used
+while getopts "f:i:h" opt; do
+  case $opt in
+    f) file=$OPTARG; no_flags=false ;;
+    i) interval=$OPTARG; no_flags=false ;;
+    h | *) usage ;;
+  esac
+done
+
+# Check if no flags were used, only values
+if $no_flags && [[ $# -gt 0 ]]; then # Positional arguments detected without flags
+    printf 'No flag(s) detected, using values as positional arguments instead.\n'
+    file=${1:-$HOME/battery-log.csv}
+    interval=${2:-60s}
+elif [[ $# -gt 0 ]]; then
+    printf 'Flag(s) detected, any positional argument not prefixed with a flag will be ignored.\n'
+else
+    printf 'No argument(s) provided, using only default values.\n'
+fi
+
+# Main execution
+main
