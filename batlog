@@ -29,7 +29,7 @@ printf "batlog allows monitoring battery level and CPU usage and speed over time
 Usage: ./batlog [-f FILE] [-i INTERVAL]
 
 Options:
-  -f FILE       file to log data to (default: ./battery-log.csv)
+  -f FILE       file to log data to (default: ~/battery-log.csv)
   -i INTERVAL   log frequency, set as a duration (default: 60s)
   -b BATTERY    battery name as referred to in /sys/class/power_supply/ (default: BAT0)
   -h            show this help
@@ -79,7 +79,7 @@ main() {
 }
 
 # Parse arguments using getopts
-file="battery-log.csv"
+file="$HOME/battery-log.csv"
 interval=60
 no_flags=true  # Flag to track if no flags were used
 while getopts "f:i:b:h" opt; do
