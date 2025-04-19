@@ -47,7 +47,7 @@ main() {
 
     # Create the file if it doesn't exist and add header if it's a new file
     if [ ! -f "$file" ]; then
-	echo "Timestamp; Battery level (%); CPU usage (%); CPU frequency; Battery temperature (°C); Most CPU intensive processes" > "$file"
+	echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Battery temperature (°C);Top-5 processes" > "$file"
     fi
     head -n 1 "$file"
 
@@ -72,7 +72,7 @@ main() {
 			| sed 's/bash //g' \
 			| cut -d ' ' -f 2-6 \
 			| sed 's/ /, /g')
-	echo "$(date -Is); $capacity; $percentage; $speed; $temperature; $processes" >> "$file"
+	echo "$(date -Is);$capacity;$percentage;$speed;$temperature;$processes" >> "$file"
 	tail -n 1 "$file"
 	sleep $interval
     done
