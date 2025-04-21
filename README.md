@@ -30,7 +30,7 @@ All arguments are optional. Values can be provided as positional arguments in th
 if not prefixed with flags, or provided in any order if prefixed with flags.
 ```
 
-#### Example output
+###### Example output
 
 ```
 ● Charge control enabled
@@ -62,7 +62,7 @@ All arguments are optional. Values can be provided as positional arguments in th
 if not prefixed with flags, or provided in any order if prefixed with flags.
 ```
 
-#### Example syslog CSV file
+###### Example syslog CSV file
 
 ```csv
 Timestamp;Battery level (%);CPU usage (%);CPU frequency;Temperature (°C);Top-5 processes
@@ -94,7 +94,7 @@ options:
   -i INPUT, --input INPUT  input CSV file
 ```
 
-#### Example plots
+###### Example plots
 
 [![plot-syslog](demo/plot-syslog-example1.png)](demo/plot-syslog-example.html)
 [![plot-syslog](demo/plot-syslog-example2.png)](demo/plot-syslog-example.html)
