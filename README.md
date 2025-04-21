@@ -98,3 +98,5 @@ options:
 
 [![plot-syslog](demo/plot-syslog-example1.png)](demo/plot-syslog-example.html)
 [![plot-syslog](demo/plot-syslog-example2.png)](demo/plot-syslog-example.html)
+
+Arrows mark changes in the top-5 most CPU intensive processes (_i.e._, no arrows means the list remained unchanged).
