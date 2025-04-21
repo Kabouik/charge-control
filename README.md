@@ -8,6 +8,8 @@ This repository contains three scripts to monitor and plot battery use, as well 
 
 Clone this repository with `git clone URL` or download just the script(s) you need, then check usage for each individual script:
 
+---
+
 ### `charge-control`
 
 Root permissions are required to write to `uevent` and activate or deactivate charge, this script must therefore be executed with `sudo`.
@@ -40,6 +42,8 @@ if not prefixed with flags, or provided in any order if prefixed with flags.
   ▪ Charge disabled until battery drops to 75% (21:02)
   ⣷ Monitoring battery level...
 ```
+
+---
 
 ### `syslog`
 
@@ -75,6 +79,8 @@ Timestamp;Battery level (%);CPU usage (%);CPU frequency;Temperature (°C);Top-5 
 2025-04-21T17:55:28+02:00;94;1.5%;1.10 GHz;44.6;bwrap, chromium, QtWebEngineProc, stremio, guix
 2025-04-21T17:56:28+02:00;94;1.9%;1.10 GHz;45.0;bwrap, chromium, QtWebEngineProc, R, guix
 ```
+
+---
 
 ### `plot-syslog.py`
 
