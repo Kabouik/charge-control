@@ -94,7 +94,7 @@ options:
   -i INPUT, --input INPUT  input CSV file
 ```
 
-#### Example plot
+#### Example plots
 
-[![plot-syslog](demo/plot-syslog-example.png)](demo/plot-syslog-example.html)
-
+[![plot-syslog](demo/plot-syslog-example1.png)](demo/plot-syslog-example.html)
+[![plot-syslog](demo/plot-syslog-example2.png)](demo/plot-syslog-example.html)
