@@ -248,11 +248,11 @@ html_content = f"""<!DOCTYPE html>
             const layout = {{
                 title: null,
                 font: {{ family: 'monospace' }},
-                xaxis: {{ type: 'date', title: 'Time', tickangle: 45 }},
+                xaxis: {{ type: 'date', title: null, tickangle: 45 }},
                 yaxis: {{ title: displayLabel(mainVar) }},
                 annotations: showAnnotations ? buildAnnotations() : [],
                 hovermode: 'closest',
-                margin: {{ l: 60, r: 30, b: 60, t: 60 }}
+                margin: {{ l: 60, r: 30, b: 90, t: 60 }}
             }};
     
             Plotly.newPlot('plot', segs.concat(extra), layout, {{
