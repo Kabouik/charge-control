@@ -28,13 +28,14 @@ check_dependencies() {
     local packages=()
     
     # Check for required commands and map to packages
-    for cmd in cpufreq-info sensors top ps; do
+    for cmd in cpufreq-info sensors mpstat top ps; do
         if ! type "$cmd" >/dev/null 2>&1; then
             missing+=("$cmd")
             case "$cmd" in
                 cpufreq-info) packages+=("cpufreq-utils") ;;
                 sensors) packages+=("lm-sensors") ;;
-                top|ps) packages+=("procps") ;;
+		mpstat) packages+=("sysstat") ;;
+		top|ps) packages+=("procps") ;;
             esac
         fi
     done
@@ -70,22 +71,28 @@ main() {
 	printf '\033[31mInvalid battery name. Try the following: %s.\033[0m\n' "$(find /sys/class/power_supply -mindepth 1 | cut -d '/' -f 5 | xargs | sed 's/ /, /')"
 	exit 0
     else
+	# Check if $batname temperature exists, else warn about replacement sensor
+	temperature=$(sensors | grep -A2 "$batname" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	[ -z "$temperature" ] && printf '\033[33mNo temperature sensor found for %s, using acpitz sensor instead.\033[0m\n' "$batname"
 	printf "Logging to '%s' at a %s interval…\n" "$file" "$interval"
 
 	# Create the file if it doesn't exist and add header if it's a new file
 	if [ ! -f "$file" ]; then
-	    echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Battery temperature (°C);Top-5 processes" > "$file"
+	    echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Temperature (°C);Top-5 processes" > "$file"
 	fi
 	head -n 1 "$file"
 
 	# Monitor variables
 	while :; do
 	    capacity=$(cat "/sys/class/power_supply/$batname/capacity")
-	    temperature=$(sensors | grep "$batname" -A2 | grep "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	    temperature=$(sensors | grep -A2 "$batname" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	    [ -z "$temperature" ] && temperature=$(sensors | grep -A2 "acpitz" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
 	    if ! type batman-helper >/dev/null 2>&1; then
-		percentage=$(top -bn1 | grep "Cpu(s)" | \
-				 sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
-				 awk '{print 100 - $1"%"}')
+		# Uncomment if below command doesn't work on smartphone
+		# percentage=$(top -bn1 | grep "Cpu(s)" | \
+		# 		 sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
+		# 		 awk '{print 100 - $1"%"}')
+		percentage=$(mpstat 1 1 | awk '/Average:/ {printf "%.1f%%\n", 100-$NF}')
 	    else
 		percentage=$(batman-helper cpu)
 	    fi
