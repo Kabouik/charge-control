@@ -37,7 +37,7 @@ PALETTE = [
 
 # CLI
 parser = argparse.ArgumentParser(description='Generate interactive plot from syslog log file')
-parser.add_argument('-i', '--input', default='battery-log.csv', help='input CSV file')
+parser.add_argument('-i', '--input', default='sys-log.csv', help='input CSV file')
 args = parser.parse_args()
 
 # Read and parse CSV
@@ -85,7 +85,7 @@ for d in data:
     d["Time"] = d["Time"].isoformat()
 
 rows_js = json.dumps(data)
-rocket_js = json.dumps(PALETTE)
+palette_js = json.dumps(PALETTE)
 annotations = ",".join(
     (
         "{{x: \"{x}\", y: {y}, text: \"↙\", showarrow: false, "
@@ -107,8 +107,9 @@ html_content = f"""<!DOCTYPE html>
         #plot {{ width: 100%; height: 100%; position: relative; }}
         #controls {{
             position: absolute;
-            bottom: 110px;
+            bottom: 110px;  /* ← REMOVE or override in JS */
             left: 90px;
+            top: auto;      /* ← Add this */
             background: rgba(255,255,255,0.8);
             padding: 6px;
             z-index: 1000;
@@ -116,6 +117,7 @@ html_content = f"""<!DOCTYPE html>
             font-family: monospace;
             border: 1px solid #ccc;
             max-width: 260px;
+            cursor: grab;   /* Optional visual hint */
         }}
         #extraVar div.selected {{
             background-color: rgba(225,225,225,0.4);
@@ -137,11 +139,11 @@ html_content = f"""<!DOCTYPE html>
         <div id="controls">
             <div style="display: grid; row-gap: 4px; font-size: 10px; font-family: monospace;">
                 <div style="display: grid; grid-template-columns: 1fr 2fr; column-gap: 8px;">
-                    <label for="mainVar"><b>Variable:</b></label>
+                    <label for="mainVar"><b>Main variable:</b></label>
                     <select id="mainVar" style="width: 100%; font-size:10px;"></select>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 2fr; column-gap: 8px;">
-                    <label for="colorVar"><b>Gradient:</b></label>
+                    <label for="colorVar"><b>Main gradient:</b></label>
                     <select id="colorVar" style="width: 100%; font-size:10px;"></select>
                 </div>
                 <div style="display: grid; grid-template-columns: 2fr 1fr; column-gap: 30px;">
@@ -167,7 +169,7 @@ html_content = f"""<!DOCTYPE html>
     console.log("First row:", rawData[0]);
     console.log("Available keys:", Object.keys(rawData[0]));
 
-    const rocket = {rocket_js};
+    const palette = {palette_js};
     function buildAnnotations() {{
         const result = [];
         let prev = null;
@@ -197,10 +199,10 @@ html_content = f"""<!DOCTYPE html>
         const vals = rawData.map(d => d[colorVar]);
         const min = Math.min(...vals);
         const max = Math.max(...vals);
-        if (min === max) return rocket[Math.floor(rocket.length / 2)];
+        if (min === max) return palette[Math.floor(palette.length / 2)];
         const norm = (val - min) / (max - min);
-        const idx = Math.floor(norm * (rocket.length - 1));
-        return rocket[Math.max(0, Math.min(idx, rocket.length - 1))];
+        const idx = Math.floor(norm * (palette.length - 1));
+        return palette[Math.max(0, Math.min(idx, palette.length - 1))];
     }}
 
     function drawPlot() {{
@@ -323,6 +325,32 @@ html_content = f"""<!DOCTYPE html>
 
     populateSelectors();
     drawPlot();
+
+    // Draggable #controls panel
+    (() => {{
+        const dragEl = document.getElementById("controls");
+        let offsetX = 0, offsetY = 0, isDragging = false;
+    
+        dragEl.addEventListener("mousedown", e => {{
+            if (e.target.tagName === "SELECT" || e.target.tagName === "BUTTON") return;
+            isDragging = true;
+            offsetX = e.clientX - dragEl.offsetLeft;
+            offsetY = e.clientY - dragEl.offsetTop;
+            dragEl.style.cursor = "move";
+        }});
+    
+        document.addEventListener("mousemove", e => {{
+            if (!isDragging) return;
+            dragEl.style.left = (e.clientX - offsetX) + "px";
+            dragEl.style.top = (e.clientY - offsetY) + "px";
+            dragEl.style.bottom = "auto"; // Override initial positioning
+        }});
+    
+        document.addEventListener("mouseup", () => {{
+            isDragging = false;
+            dragEl.style.cursor = "default";
+        }});
+    }})();
     </script>
 </body>
 </html>
