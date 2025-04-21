@@ -1,8 +1,8 @@
 This repository contains three scripts to monitor and plot battery use, as well as constrain charging intervals to avoid overstressing the battery with full charges or full discharges.
 
-- *`charge-control`*: set minimal and maximal battery levels within which charging is allowed, and a poweroff threshold; the method used to control charging is primarily made for smartphones and may not be exposed in other devices
-- *`syslog`*: log battery level, temperature, CPU use and frequency, and most CPU-intensive processes over time to a CSV file
-- *`plot-syslog.py`*: plot the CSV file as an interactive graph
+- **`charge-control`**: set minimal and maximal battery levels within which charging is allowed, and a poweroff threshold; the method used to control charging is primarily made for smartphones and may not be exposed in other devices
+- **`syslog`**: log battery level, temperature, CPU use and frequency, and most CPU-intensive processes over time to a CSV file
+- **`plot-syslog.py`**: plot the CSV file as an interactive graph
 
 ## How to use
 
