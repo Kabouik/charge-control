@@ -33,11 +33,12 @@ battery with full charges or full discharges. The script requires root permissio
 Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION]
 
 Options:
-  -d DEACTIVATION: battery percentage at which charge is disabled (default: 90)
-  -r REACTIVATION: battery percentage at which charge is enabled (default: 75)
-  -f FREQUENCY: monitoring frequency of battery level (default: 10s)
-  -p POWEROFF: battery percentage at which the device is powered off (default: 10)
-  -a ANIMATION: monitoring animation, 1, 2, 3 or 4, in decreasing CPU usage order (default: 2)
+  -d DEACTIVATION  battery percentage at which charge is disabled (default: 90)
+  -r REACTIVATION  battery percentage at which charge is enabled (default: 75)
+  -f FREQUENCY     monitoring frequency of battery level (default: 10s)
+  -p POWEROFF      battery percentage at which the device is powered off (default: 10)
+  -a ANIMATION     monitoring animation, 1, 2, 3 or 4, in decreasing CPU usage order (default: 2)
+  -b BATTERY       battery name as referred to in /sys/class/power_supply/ (default: BAT0)
   -h: show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
@@ -118,7 +119,7 @@ check_values() {
   Charge reactivation level: %s%%
   Monitoring frequency: %s
   Auto power-off level: %s%%\n' "$deactivation" "$reactivation" "$frequency" "$poweroff"
-        uevent=$(<"/sys/class/power_supply/battery/uevent")
+        uevent=$(<"/sys/class/power_supply/$batname/uevent")
         capacity=$(grep -oP "(?<=POWER_SUPPLY_CAPACITY=).*" <<< "$uevent")
 	if (( capacity >= $reactivation )) && (( capacity < $deactivation )); then
 	    readytocharge="1"
@@ -143,7 +144,7 @@ monitor() {
     spinner_pid=0
     spinner &
     while :; do
-        uevent=$(<"/sys/class/power_supply/battery/uevent")
+        uevent=$(<"/sys/class/power_supply/$batname/uevent")
         status=$(grep -oP "(?<=POWER_SUPPLY_STATUS=).*" <<< "$uevent")
         capacity=$(grep -oP "(?<=POWER_SUPPLY_CAPACITY=).*" <<< "$uevent")
         suspend=$(grep -oP "(?<=POWER_INPUT_SUSPEND=).*" <<< "$uevent")
@@ -190,13 +191,14 @@ frequency=10s
 poweroff=10
 animation=2
 no_flags=true  # Flag to track if no flags were used
-while getopts "d:r:f:p:a:h" opt; do
+while getopts "d:r:f:p:a:b:h" opt; do
   case $opt in
     d) deactivation=$OPTARG; no_flags=false ;;
     r) reactivation=$OPTARG; no_flags=false ;;
     f) frequency=$OPTARG; no_flags=false ;;
     p) poweroff=$OPTARG; no_flags=false ;;
     a) animation=$OPTARG; no_flags=false ;;
+    b) batname=$OPTARG; no_flags=false ;;
     h | *) usage ;;
   esac
 done
@@ -209,6 +211,7 @@ if $no_flags && [[ $# -gt 0 ]]; then # Positional arguments detected without fla
     frequency=${3:-10s}
     poweroff=${4:-10}
     animation=${5:-2}
+    batname=${6:-BAT0}
 elif [[ $# -gt 0 ]]; then
     printf 'Flag(s) detected, any positional argument not prefixed with a flag will be ignored.\n'
 else
