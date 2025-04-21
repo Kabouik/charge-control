@@ -48,9 +48,9 @@ check_dependencies() {
 
 # Function to show usage/help
 usage() {
-printf "batlog allows monitoring battery level and CPU usage and speed over time.
+printf "syslog allows monitoring battery level and CPU usage and speed over time.
 
-Usage: ./batlog [-f FILE] [-i INTERVAL]
+Usage: $0 [-f FILE] [-i INTERVAL]
 
 Options:
   -f FILE       file to log data to (default: ~/battery-log.csv)

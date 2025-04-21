@@ -36,7 +36,7 @@ PALETTE = [
 ]
 
 # CLI
-parser = argparse.ArgumentParser(description='Generate interactive plot from battery log')
+parser = argparse.ArgumentParser(description='Generate interactive plot from syslog log file')
 parser.add_argument('-i', '--input', default='battery-log.csv', help='input CSV file')
 args = parser.parse_args()
 
@@ -47,7 +47,7 @@ with open(args.input, "r") as f:
     for row in reader:
         try:
             entry = {"Time": row["Timestamp"]}
-            entry["Processes"] = find_column(row, ["Most CPU intensive processes", "Top processes", "Processes"])
+            entry["Processes"] = find_column(row, ["Top-5 processes"])
             for k, v in row.items():
                 key = k.strip()
                 try:
@@ -97,7 +97,7 @@ annotations = ",".join(
 html_content = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>batlog viewer</title>
+    <title>syslog viewer</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         html, body {{
@@ -231,13 +231,17 @@ html_content = f"""<!DOCTYPE html>
                 }});
             }}
     
-            const extra = extraVars.map(v => ({{
-                x: rawData.map(d => d.Time),
-                y: rawData.map(d => normalizeValue(d[v], v)),
-                mode: 'lines',
-                name: v,
-                line: {{ width: 1 }}
-            }}));
+            const extra = extraVars
+                .filter(v => v !== mainVar) // ← prevent mainVar duplication
+                .map(v => ({{
+                    x: rawData.map(d => d.Time),
+                    y: rawData.map(d => normalizeValue(d[v], v)),
+                    text: rawData.map(d => d.HoverText),  // ← full multiline tooltip
+                    mode: 'lines',
+                    name: v,
+                    hovertemplate: '%{{text}}<extra></extra>',
+                    line: {{ width: 1 }}
+                }}));
     
             const layout = {{
                 title: null,

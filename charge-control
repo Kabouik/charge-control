@@ -30,7 +30,7 @@ usage() {
 printf "charge-control allows controlling battery charge to avoid overstressing the
 battery with full charges or full discharges. The script requires root permissions.
 
-Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION] [-b BATTERY]
+Usage: sudo $0 [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION] [-b BATTERY]
 
 Options:
   -d DEACTIVATION  battery percentage at which charge is disabled (default: 90)
