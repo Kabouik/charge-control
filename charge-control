@@ -155,20 +155,20 @@ monitor() {
             "Charging")
                 if (( capacity >= $deactivation )); then
 		    readytocharge="0"
-                    echo 1 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+                    echo 1 | tee /sys/class/power_supply/$batname/input_suspend >/dev/null 2>&1
                     printf '\033[33m  ▪ Charge disabled until battery drops to %s%%\033[0m (%s)\n' "$reactivation" "$(date +'%R')"
                 fi
                 ;;
             "Discharging")
                 if (( capacity <= $reactivation )) && [[ "$suspend" -eq "1" ]]; then
-                    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+                    echo 0 | tee /sys/class/power_supply/$batname/input_suspend >/dev/null 2>&1
                     printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
                 elif (( capacity <= $reactivation )) && [[ "$suspend" -eq "0" ]] && [[ "$readytocharge" -eq "0" ]]; then
 		    readytocharge="1"
-		    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+		    echo 0 | tee /sys/class/power_supply/$batname/input_suspend >/dev/null 2>&1
 		    printf '\033[32m  ▪ Charge enabled until battery reaches %s%%\033[0m (%s)\n' "$deactivation" "$(date +'%R')"
                 elif (( capacity <= $poweroff )); then
-                    echo 0 | tee /sys/class/power_supply/battery/input_suspend >/dev/null 2>&1
+                    echo 0 | tee /sys/class/power_supply/$batname/input_suspend >/dev/null 2>&1
                     printf '\033[31m  ▪ Battery level critically low (< %s%%), powering off in 60s…\033[0m (%s)\n' "$poweroff" "$(date +'%R')"
                     sleep 60s
 		    poweroff --halt
@@ -225,5 +225,9 @@ if [[ ! $UID = 0 ]]; then
     printf "This script must be run as root.\n"
     exit 0
 else
+    if ! [[ -f "/sys/class/power_supply/$batname/input_suspend" ]]; then
+        printf "Your device does not seem to support disabling charge from software. The method we use is primarily made for smartphones and may not be exposed in your machine.\n"
+	exit 0
+    fi    
     check_values $deactivation $reactivation $frequency $poweroff $animation $batname
 fi
