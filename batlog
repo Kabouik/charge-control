@@ -22,6 +22,29 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# Function to check for required dependencies
+check_dependencies() {
+    local missing=()
+    local packages=()
+    
+    # Check for required commands and map to packages
+    for cmd in cpufreq-info sensors top ps; do
+        if ! type "$cmd" >/dev/null 2>&1; then
+            missing+=("$cmd")
+            case "$cmd" in
+                cpufreq-info) packages+=("cpufreq-utils") ;;
+                sensors) packages+=("lm-sensors") ;;
+                top|ps) packages+=("procps") ;;
+            esac
+        fi
+    done
+    
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        printf '\033[31mError: missing dependencies: %s\033[0m\n' "${packages[*]}"
+        exit 1
+    fi
+}
+
 # Function to show usage/help
 usage() {
 printf "batlog allows monitoring battery level and CPU usage and speed over time.
@@ -43,44 +66,49 @@ exit 0
 
 # Create file, check variable values and loop
 main() {
-    printf "Logging to '%s' at a %s interval…\n" "$file" "$interval"
+    if ! [[ -d "/sys/class/power_supply/$batname" ]]; then
+	printf '\033[31mInvalid battery name. Try the following: %s.\033[0m\n' "$(find /sys/class/power_supply -mindepth 1 | cut -d '/' -f 5 | xargs | sed 's/ /, /')"
+	exit 0
+    else
+	printf "Logging to '%s' at a %s interval…\n" "$file" "$interval"
 
-    # Create the file if it doesn't exist and add header if it's a new file
-    if [ ! -f "$file" ]; then
-	echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Battery temperature (°C);Top-5 processes" > "$file"
-    fi
-    head -n 1 "$file"
-
-    # Monitor variables
-    while :; do
-	capacity=$(cat "/sys/class/power_supply/$batname/capacity")
-	temperature=$(sensors | grep "$batname" -A2 | grep "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
-	if ! type batman-helper >/dev/null 2>&1; then
-	    percentage=$(top -bn1 | grep "Cpu(s)" | \
-			     sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
-			     awk '{print 100 - $1"%"}')
-	else
-	    percentage=$(batman-helper cpu)
+	# Create the file if it doesn't exist and add header if it's a new file
+	if [ ! -f "$file" ]; then
+	    echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Battery temperature (°C);Top-5 processes" > "$file"
 	fi
-	speed=$(cpufreq-info -m -c $(cpufreq-info -r) | grep "current CPU frequency is" | cut -d ' ' -f 7-8 | cut -d 'H' -f 1-2 | sed 's/Hz./Hz/g')
-	processes=$(ps -Ao comm --sort=-pcpu | head -n 20 | xargs \
-			| sed 's/ps //g' \
-			| sed 's/sed //g' \
-			| sed 's/head //g' \
-			| sed 's/xargs //g' \
-			| sed 's/cut //g' \
-			| sed 's/bash //g' \
-			| cut -d ' ' -f 2-6 \
-			| sed 's/ /, /g')
-	echo "$(date -Is);$capacity;$percentage;$speed;$temperature;$processes" >> "$file"
-	tail -n 1 "$file"
-	sleep $interval
-    done
+	head -n 1 "$file"
+
+	# Monitor variables
+	while :; do
+	    capacity=$(cat "/sys/class/power_supply/$batname/capacity")
+	    temperature=$(sensors | grep "$batname" -A2 | grep "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	    if ! type batman-helper >/dev/null 2>&1; then
+		percentage=$(top -bn1 | grep "Cpu(s)" | \
+				 sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
+				 awk '{print 100 - $1"%"}')
+	    else
+		percentage=$(batman-helper cpu)
+	    fi
+	    speed=$(cpufreq-info -m -c $(cpufreq-info -r) | grep "current CPU frequency is" | cut -d ' ' -f 7-8 | cut -d 'H' -f 1-2 | sed 's/Hz./Hz/g')
+	    processes=$(ps -Ao comm --sort=-pcpu | head -n 20 | xargs \
+			    | sed 's/ps //g' \
+			    | sed 's/sed //g' \
+			    | sed 's/head //g' \
+			    | sed 's/xargs //g' \
+			    | sed 's/cut //g' \
+			    | sed 's/bash //g' \
+			    | cut -d ' ' -f 2-6 \
+			    | sed 's/ /, /g')
+	    echo "$(date -Is);$capacity;$percentage;$speed;$temperature;$processes" >> "$file"
+	    tail -n 1 "$file"
+	    sleep $interval
+	done
+    fi
 }
 
 # Parse arguments using getopts
-file="$HOME/battery-log.csv"
-interval=60
+file="battery-log.csv"
+interval=60s
 no_flags=true  # Flag to track if no flags were used
 while getopts "f:i:b:h" opt; do
   case $opt in
@@ -102,6 +130,9 @@ elif [[ $# -gt 0 ]]; then
 else
     printf 'No argument(s) provided, using only default values.\n'
 fi
+
+# Check for required dependencies before proceeding
+check_dependencies
 
 # Main execution
 main

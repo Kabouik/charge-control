@@ -30,7 +30,7 @@ usage() {
 printf "charge-control allows controlling battery charge to avoid overstressing the
 battery with full charges or full discharges. The script requires root permissions.
 
-Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION]
+Usage: sudo ./charge-control [-d DEACTIVATION] [-r REACTIVATION] [-f FREQUENCY] [-p POWEROFF] [-a ANIMATION] [-b BATTERY]
 
 Options:
   -d DEACTIVATION  battery percentage at which charge is disabled (default: 90)
@@ -39,7 +39,7 @@ Options:
   -p POWEROFF      battery percentage at which the device is powered off (default: 10)
   -a ANIMATION     monitoring animation, 1, 2, 3 or 4, in decreasing CPU usage order (default: 2)
   -b BATTERY       battery name as referred to in /sys/class/power_supply/ (default: BAT0)
-  -h: show this help
+  -h               show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
 if not prefixed with flags, or provided in any order if prefixed with flags.
@@ -89,7 +89,9 @@ spinner() {
 
 # Check that argument values are legal
 check_values() {
-    if [[ ! $deactivation =~ ^[0-9]+$ ]]; then
+    if ! [[ -d "/sys/class/power_supply/$batname" ]]; then
+	printf '\033[31mInvalid battery name. Try the following: %s.\033[0m\n' "$(find /sys/class/power_supply -mindepth 1 | cut -d '/' -f 5 | xargs | sed 's/ /, /')"
+    elif [[ ! $deactivation =~ ^[0-9]+$ ]]; then
 	printf '\033[31mInvalid DEACTIVATION percentage: this must be a numeric value between 50 and 100. Aborting.\033[0m\n'
 	exit 0
     elif [[ ! $reactivation =~ ^[0-9]+$ ]]; then
@@ -223,5 +225,5 @@ if [[ ! $UID = 0 ]]; then
     printf "This script must be run as root.\n"
     exit 0
 else
-    check_values $deactivation $reactivation $frequency $poweroff $animation
+    check_values $deactivation $reactivation $frequency $poweroff $animation $batname
 fi
