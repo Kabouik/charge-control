@@ -88,8 +88,8 @@ rows_js = json.dumps(data)
 palette_js = json.dumps(PALETTE)
 annotations = ",".join(
     (
-        "{{x: \"{x}\", y: {y}, text: \"↙\", showarrow: false, "
-        "xanchor: 'left', yanchor: 'bottom', font: {{color: 'darkgrey', size: 22, family: 'monospace'}}}}"
+        "{{x: \"{x}\", y: {y}, text: \"+\", showarrow: false, "
+        "xanchor: 'center', yanchor: 'bottom', font: {{color: 'darkgrey', size: 12, family: 'monospace'}}}}"
     ).format(x=d["Time"], y = next((v for k, v in d.items() if isinstance(v, float) and "battery" in k.lower()), 0))
     for d in label_points
 )
@@ -98,7 +98,7 @@ html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <title>syslog viewer</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
     <style>
         html, body {{
             margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -155,9 +155,9 @@ html_content = f"""<!DOCTYPE html>
                     </div>
                     <div style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%;">
                         <br>
-                        <button id="toggle-btn" title="Toggle arrows"
+                        <button id="toggle-btn" title="Toggle markers"
                                 style="font-size:10px; padding:2px 4px; width:100%;">
-                            Toggle<br>top-5<br>processes<br>change<br>arrows
+                            Toggle<br>top-5<br>processes<br>change<br>markers
                         </button>
                     </div>
                 </div>
@@ -178,11 +178,11 @@ html_content = f"""<!DOCTYPE html>
                 result.push({{
                     x: d.Time,
                     y: normalizeValue(d[mainVar], mainVar),
-                    text: "↙",
+                    text: "+",
                     showarrow: false,
-                    xanchor: "left",
+                    xanchor: "center",
                     yanchor: "bottom",
-                    font: {{ color: "darkgrey", size: 22, family: "monospace" }}
+                    font: {{ color: "darkgrey", size: 12, family: "monospace" }}
                 }});
             }}
             prev = d.Processes;
@@ -274,7 +274,7 @@ html_content = f"""<!DOCTYPE html>
     }});
 
     function displayLabel(v) {{
-        return v === "CPU clock" ? "CPU clock (MHz) × 10⁻²" : v;
+        return v === "CPU clock" ? "CPU clock (MHz) &#215; 10&#8315;&#178;" : v;
     }}
 
     function normalizeValue(v, key) {{
@@ -297,7 +297,7 @@ html_content = f"""<!DOCTYPE html>
     
             // Custom extras dropdown (click toggle, no Ctrl)
             const div = document.createElement("div");
-            div.textContent = displayLabel(v);
+            div.innerHTML = displayLabel(v);
             div.dataset.key = v;
             div.style.cursor = "pointer";
             div.style.userSelect = "none";
@@ -357,7 +357,7 @@ html_content = f"""<!DOCTYPE html>
 """
 
 output_file = args.input.replace('.csv', '.html')
-with open(output_file, "w") as f:
+with open(output_file, "w", encoding="utf-8") as f:
     f.write(html_content)
 
 print(f"Interactive plot saved to {output_file}")
