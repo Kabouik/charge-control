@@ -46,12 +46,12 @@ with open(args.input, "r") as f:
     reader = csv.DictReader(f, delimiter=";")
     for row in reader:
         try:
-            entry = {"Time": row["Timestamp"]}
+            entry = {"Time": row["Time"]}
             entry["Processes"] = find_column(row, ["Top-5 processes"])
             for k, v in row.items():
                 key = k.strip()
                 try:
-                    if "freq" in key.lower():
+                    if "clock" in key.lower():
                         entry[key] = parse_freq(v)
                     else:
                         entry[key] = float(v.strip().replace("%", ""))
@@ -107,9 +107,9 @@ html_content = f"""<!DOCTYPE html>
         #plot {{ width: 100%; height: 100%; position: relative; }}
         #controls {{
             position: absolute;
-            bottom: 110px;  /* ← REMOVE or override in JS */
+            bottom: 110px;
             left: 90px;
-            top: auto;      /* ← Add this */
+            top: auto;
             background: rgba(255,255,255,0.8);
             padding: 6px;
             z-index: 1000;
@@ -117,7 +117,7 @@ html_content = f"""<!DOCTYPE html>
             font-family: monospace;
             border: 1px solid #ccc;
             max-width: 260px;
-            cursor: grab;   /* Optional visual hint */
+            cursor: grab;
         }}
         #extraVar div.selected {{
             background-color: rgba(225,225,225,0.4);
@@ -146,7 +146,7 @@ html_content = f"""<!DOCTYPE html>
                     <label for="colorVar"><b>Main gradient:</b></label>
                     <select id="colorVar" style="width: 100%; font-size:10px;"></select>
                 </div>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; column-gap: 30px;">
+                <div style="display: grid; grid-template-columns: 2fr 1fr; column-gap: 20px;">
                     <div>
                         <label for="extraVar"><b>Show extra variables:</b></label>
                         <div id="extraVar"
@@ -157,7 +157,7 @@ html_content = f"""<!DOCTYPE html>
                         <br>
                         <button id="toggle-btn" title="Toggle arrows"
                                 style="font-size:10px; padding:2px 4px; width:100%;">
-                            Toggle<br>top-5<br>processes<br>arrows
+                            Toggle<br>top-5<br>processes<br>change<br>arrows
                         </button>
                     </div>
                 </div>
@@ -191,12 +191,12 @@ html_content = f"""<!DOCTYPE html>
     }}
 
     const variables = Object.keys(rawData[0]).filter(k => typeof rawData[0][k] === "number");
-    let mainVar = variables.includes("Battery level (%)") ? "Battery level (%)" : variables[0];
-    let colorVar = variables.includes("CPU frequency") ? "CPU frequency" : variables[0];
+    let mainVar = variables.includes("Battery (%)") ? "Battery (%)" : variables[0];
+    let colorVar = variables.includes("CPU clock") ? "CPU clock" : variables[0];
     let extraVars = [];
 
     function getColor(val) {{
-        const vals = rawData.map(d => d[colorVar]);
+        const vals = rawData.map(d => d[colorVar]).filter(v => typeof v === "number");
         const min = Math.min(...vals);
         const max = Math.max(...vals);
         if (min === max) return palette[Math.floor(palette.length / 2)];
@@ -232,15 +232,15 @@ html_content = f"""<!DOCTYPE html>
                     showlegend: false
                 }});
             }}
-    
+
             const extra = extraVars
                 .filter(v => v !== mainVar) // ← prevent mainVar duplication
                 .map(v => ({{
                     x: rawData.map(d => d.Time),
                     y: rawData.map(d => normalizeValue(d[v], v)),
-                    text: rawData.map(d => d.HoverText),  // ← full multiline tooltip
+                    text: rawData.map(d => d.HoverText),
                     mode: 'lines',
-                    name: v,
+                    name: displayLabel(v),
                     hovertemplate: '%{{text}}<extra></extra>',
                     line: {{ width: 1 }}
                 }}));
@@ -274,11 +274,11 @@ html_content = f"""<!DOCTYPE html>
     }});
 
     function displayLabel(v) {{
-        return v === "CPU frequency" ? "CPU frequency (/100 MHz)" : v;
+        return v === "CPU clock" ? "CPU clock (MHz) × 10⁻²" : v;
     }}
 
     function normalizeValue(v, key) {{
-        return key === "CPU frequency" ? v / 100 : v;
+        return key === "CPU clock" ? v / 100: v;
     }}
 
     function populateSelectors() {{

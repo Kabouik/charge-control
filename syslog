@@ -28,13 +28,14 @@ check_dependencies() {
     local packages=()
     
     # Check for required commands and map to packages
-    for cmd in cpufreq-info sensors mpstat top ps; do
+    for cmd in cpufreq-info sensors mpstat column top ps; do
         if ! type "$cmd" >/dev/null 2>&1; then
             missing+=("$cmd")
             case "$cmd" in
                 cpufreq-info) packages+=("cpufreq-utils") ;;
                 sensors) packages+=("lm-sensors") ;;
 		mpstat) packages+=("sysstat") ;;
+		column) packages+=("bsdextrautils") ;;
 		top|ps) packages+=("procps") ;;
             esac
         fi
@@ -48,14 +49,15 @@ check_dependencies() {
 
 # Function to show usage/help
 usage() {
-printf "syslog allows monitoring battery level and CPU usage and speed over time.
+printf "syslog allows monitoring battery level, PPT, temperature, CPU use and CPU clock over time.
 
 Usage: $0 [-f FILE] [-i INTERVAL]
 
 Options:
-  -f FILE       file to log data to (default: ~/battery-log.csv)
-  -i INTERVAL   log frequency, set as a duration (default: 60s)
+  -f FILE       file to log data to (default: ./sys-log.csv)
+  -i INTERVAL   log clock, set as a duration (default: 60s)
   -b BATTERY    battery name as referred to in /sys/class/power_supply/ (default: BAT0)
+  -p            plot data to HTML file (same basename as the log file) while logging (may cause CPU spikes) 
   -h            show this help
 
 All arguments are optional. Values can be provided as positional arguments in that order
@@ -63,6 +65,19 @@ if not prefixed with flags, or provided in any order if prefixed with flags.
 
 "
 exit 0
+}
+
+# Plot function
+plot() {
+    local file="${1}"
+    if [[ -n $plot ]]; then
+	if ! type python3 >/dev/null 2>&1; then
+	    printf '\033[31mError: missing dependency for plotting data: python3\033[0m\n'
+	    exit 1
+	else
+	    ./plot-syslog.py -i "${file}"
+	fi
+    fi
 }
 
 # Create file, check variable values and loop
@@ -74,25 +89,34 @@ main() {
 	# Check if $batname temperature exists, else warn about replacement sensor
 	temperature=$(sensors | grep -A2 "$batname" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
 	[ -z "$temperature" ] && printf '\033[33mNo temperature sensor found for %s, using acpitz sensor instead.\033[0m\n' "$batname"
-	printf "Logging to '%s' at a %s interval…\n" "$file" "$interval"
+
+	# Inform if plotting is enabeld and output file
+	if [[ -z $plot ]]; then
+	    printf "Logging to '%s' %s at a %s interval…\n\n" "$file" "$interval"
+	else
+	    printf "Logging to '%s' and plotting to '$(ls "${file}" | cut -d '.' -f -1).html' at a %s interval…\n\n" "$file"  "$interval"
+	fi
 
 	# Create the file if it doesn't exist and add header if it's a new file
 	if [ ! -f "$file" ]; then
-	    echo "Timestamp;Battery level (%);CPU usage (%);CPU frequency;Temperature (°C);Top-5 processes" > "$file"
+	    echo "Time;Battery (%);PPT (W);CPU use (%);CPU clock;Temperature (°C);Top-5 processes" > "$file"
 	fi
-	head -n 1 "$file"
+	head -n 2 "$file"  | column -t -s ';' -o ' | ' -R 1,2,3,4,5,6,7 | head -n 1
 
 	# Monitor variables
 	while :; do
 	    capacity=$(cat "/sys/class/power_supply/$batname/capacity")
+	    draw=$(sensors | grep -Po 'PPT:.*avg\s*=\s*\K[\d.]+' )
+	    draw=${draw:-NA}
 	    temperature=$(sensors | grep -A2 "$batname" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
 	    [ -z "$temperature" ] && temperature=$(sensors | grep -A2 "acpitz" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
+	    temperature=${temperature:-NA}
 	    if ! type batman-helper >/dev/null 2>&1; then
 		# Uncomment if below command doesn't work on smartphone
 		# percentage=$(top -bn1 | grep "Cpu(s)" | \
 		# 		 sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | \
 		# 		 awk '{print 100 - $1"%"}')
-		percentage=$(mpstat 1 1 | awk '/Average:/ {printf "%.1f%%\n", 100-$NF}')
+		percentage=$(mpstat 1 1 | awk '/Average:/ {printf "%.1f%%\n", 100-$NF}' | sed 's/%//')
 	    else
 		percentage=$(batman-helper cpu)
 	    fi
@@ -106,24 +130,26 @@ main() {
 			    | sed 's/bash //g' \
 			    | cut -d ' ' -f 2-6 \
 			    | sed 's/ /, /g')
-	    echo "$(date -Is);$capacity;$percentage;$speed;$temperature;$processes" >> "$file"
-	    tail -n 1 "$file"
+	    echo "$(date -Is);$capacity;$draw;$percentage;$speed;$temperature;$processes" >> "$file"
+	    cat "$file" | column -t -s ';' -o ' | ' -R 1,2,3,4,5,6,7 | tail -n 1
 	    # Sleep $interval minus the duration of the mpstat measurement (1s), while allowing intervals
 	    # in multiple units
 	    sleep $(awk 'BEGIN{n=ARGV[1]; u=substr(n,length(n),1); v=substr(n,1,length(n)-1); if(u ~ /[smhd]/){s=(u=="s"?1:u=="m"?60:u=="h"?3600:86400)*v}else{s=n}; print (s-1 > 0 ? s-1 : 0)}' "$interval")
+	    plot "${file}" >/dev/null 2>&1
 	done
     fi
 }
 
 # Parse arguments using getopts
-file="battery-log.csv"
+file="sys-log.csv"
 interval=60s
 no_flags=true  # Flag to track if no flags were used
-while getopts "f:i:b:h" opt; do
+while getopts "f:i:b:ph" opt; do
   case $opt in
     f) file=$OPTARG; no_flags=false ;;
     i) interval=$OPTARG; no_flags=false ;;
     b) batname=$OPTARG; no_flags=false ;;
+    p) plot=true; no_flags=false ;;
     h | *) usage ;;
   esac
 done
@@ -131,7 +157,7 @@ done
 # Check if no flags were used, only values
 if $no_flags && [[ $# -gt 0 ]]; then # Positional arguments detected without flags
     printf 'No flag(s) detected, using values as positional arguments instead.\n'
-    file=${1:-$HOME/battery-log.csv}
+    file=${1:-sys-log.csv}
     interval=${2:-60s}
     batname=${3:-BAT0}
 elif [[ $# -gt 0 ]]; then
