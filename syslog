@@ -110,7 +110,7 @@ main() {
             [[ "$unit" == "mW" ]] && draw=$(awk "BEGIN { print $draw / 1000 }")
 	    draw=${draw:-NA}
 	    temperature=$(sensors | grep -A2 "$batname" | grep -m1 "temp1" | cut -d '+' -f 2 | sed 's/°C//' | cut -d ' ' -f 1)
-	    [ -z "$temperature" ] && temperature=$(sensors | grep -Po 'Package.*?\+?\K[\d.]+(?=°C)' | head -1)
+	    [ -z "$temperature" ] && temperature=$(sensors | grep -Po '\+?\K[\d.]+(?=°C)' | head -1)
 	    temperature=${temperature:-NA}
 	    if ! type batman-helper >/dev/null 2>&1; then
 		# Uncomment if below command doesn't work on smartphone
